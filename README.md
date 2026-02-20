@@ -6,6 +6,7 @@
 ![Status](https://img.shields.io/badge/status-live-00ffe7?style=flat-square)
 
 ---
+<img width="1010" height="832" alt="image" src="https://github.com/user-attachments/assets/724f74da-ccbd-4156-83b1-8f1a6b88dbf1" />
 
 ## 🎮 What is TracArena?
 
