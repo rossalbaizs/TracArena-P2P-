@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TracArena — P2P Duel Gaming on Intercom</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #030b0f;
+    --bg2: #071218;
+    --neon: #00ffe7;
+    --neon2: #ff3c6e;
+    --neon3: #ffe600;
+    --dim: #0a2a33;
+    --text: #c8f0f7;
+    --muted: #4a7a8a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,231,0.015) 2px,
+      rgba(0,255,231,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* Grid bg */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,231,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,231,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Header */
+  header {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 48px 24px 32px;
+    border-bottom: 1px solid rgba(0,255,231,0.15);
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(2.4rem, 7vw, 5rem);
+    letter-spacing: 0.15em;
+    color: var(--neon);
+    text-shadow:
+      0 0 10px var(--neon),
+      0 0 40px rgba(0,255,231,0.4),
+      0 0 80px rgba(0,255,231,0.2);
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  .logo span { color: var(--neon2); text-shadow: 0 0 20px var(--neon2); }
+
+  .tagline {
+    margin-top: 10px;
+    color: var(--muted);
+    letter-spacing: 0.3em;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+
+  .net-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 6px 14px;
+    border: 1px solid rgba(0,255,231,0.3);
+    border-radius: 2px;
+    font-size: 0.7rem;
+    color: var(--neon);
+    letter-spacing: 0.2em;
+  }
+
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--neon);
+    box-shadow: 0 0 8px var(--neon);
+    animation: blink 1.2s step-start infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes pulse {
+    0%, 100% { text-shadow: 0 0 10px var(--neon), 0 0 40px rgba(0,255,231,0.4); }
+    50% { text-shadow: 0 0 20px var(--neon), 0 0 60px rgba(0,255,231,0.6), 0 0 100px rgba(0,255,231,0.3); }
+  }
+
+  /* Main layout */
+  main {
+    position: relative;
+    z-index: 10;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 720px) { main { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid rgba(0,255,231,0.2);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--neon), transparent);
+  }
+
+  .card.red::before { background: linear-gradient(90deg, transparent, var(--neon2), transparent); }
+  .card.yellow::before { background: linear-gradient(90deg, transparent, var(--neon3), transparent); }
+
+  .card-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    color: var(--neon);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .card.red .card-title { color: var(--neon2); }
+  .card.yellow .card-title { color: var(--neon3); }
+
+  /* Game Section - spans full width */
+  .game-card {
+    grid-column: 1 / -1;
+  }
+
+  /* RPS Game */
+  .game-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .vs-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .player-box {
+    text-align: center;
+  }
+
+  .player-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .choice-display {
+    font-size: 3rem;
+    min-height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--dim);
+    border: 1px solid rgba(0,255,231,0.15);
+    border-radius: 4px;
+    transition: all 0.3s;
+  }
+
+  .choice-display.win {
+    border-color: var(--neon);
+    box-shadow: 0 0 20px rgba(0,255,231,0.3);
+  }
+  .choice-display.lose {
+    border-color: var(--neon2);
+    box-shadow: 0 0 20px rgba(255,60,110,0.3);
+  }
+
+  .vs-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    color: var(--neon3);
+    text-shadow: 0 0 10px var(--neon3);
+  }
+
+  .choices-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .choice-btn {
+    background: var(--dim);
+    border: 1px solid rgba(0,255,231,0.25);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.8rem;
+    width: 72px; height: 72px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .choice-btn:hover {
+    border-color: var(--neon);
+    background: rgba(0,255,231,0.08);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,255,231,0.2);
+  }
+
+  .choice-btn:active { transform: translateY(0); }
+
+  .result-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.2em;
+    min-height: 2rem;
+    text-align: center;
+    transition: all 0.3s;
+  }
+
+  .result-text.win { color: var(--neon); text-shadow: 0 0 15px var(--neon); }
+  .result-text.lose { color: var(--neon2); text-shadow: 0 0 15px var(--neon2); }
+  .result-text.draw { color: var(--neon3); text-shadow: 0 0 15px var(--neon3); }
+
+  /* Score */
+  .score-row {
+    display: flex;
+    gap: 40px;
+  }
+
+  .score-item { text-align: center; }
+  .score-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: var(--neon);
+    text-shadow: 0 0 20px rgba(0,255,231,0.5);
+    line-height: 1;
+  }
+  .score-num.red { color: var(--neon2); text-shadow: 0 0 20px rgba(255,60,110,0.5); }
+  .score-num.yellow { color: var(--neon3); }
+  .score-label { font-size: 0.65rem; letter-spacing: 0.3em; color: var(--muted); margin-top: 4px; }
+
+  /* Leaderboard */
+  .lb-row {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,255,231,0.07);
+    font-size: 0.8rem;
+    gap: 12px;
+  }
+
+  .lb-rank {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    width: 28px;
+    color: var(--muted);
+  }
+
+  .lb-rank.top { color: var(--neon3); text-shadow: 0 0 8px var(--neon3); }
+
+  .lb-name { flex: 1; color: var(--text); }
+  .lb-score {
+    font-family: 'Orbitron', sans-serif;
+    color: var(--neon);
+    font-size: 0.85rem;
+  }
+
+  /* Intercom Feed */
+  .feed {
+    height: 200px;
+    overflow-y: auto;
+    background: #02080b;
+    border: 1px solid rgba(0,255,231,0.1);
+    border-radius: 2px;
+    padding: 12px;
+    font-size: 0.72rem;
+    line-height: 1.8;
+  }
+
+  .feed::-webkit-scrollbar { width: 4px; }
+  .feed::-webkit-scrollbar-thumb { background: rgba(0,255,231,0.2); }
+
+  .feed-line { color: var(--muted); }
+  .feed-line .ts { color: rgba(0,255,231,0.3); margin-right: 8px; }
+  .feed-line .peer { color: var(--neon); }
+  .feed-line .msg { color: var(--text); }
+  .feed-line.challenge .peer { color: var(--neon2); }
+  .feed-line.win-line .msg { color: var(--neon); }
+
+  /* Wallet / Trac */
+  .trac-addr {
+    background: #02080b;
+    border: 1px solid rgba(0,255,231,0.15);
+    border-radius: 2px;
+    padding: 10px 14px;
+    font-size: 0.72rem;
+    color: var(--neon);
+    letter-spacing: 0.05em;
+    word-break: break-all;
+    margin-top: 12px;
+  }
+
+  .connect-btn {
+    display: block;
+    width: 100%;
+    margin-top: 14px;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--neon);
+    color: var(--neon);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  .connect-btn:hover {
+    background: rgba(0,255,231,0.1);
+    box-shadow: 0 0 20px rgba(0,255,231,0.25);
+  }
+
+  /* Challenge input */
+  .input-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .peer-input {
+    flex: 1;
+    background: #02080b;
+    border: 1px solid rgba(0,255,231,0.2);
+    color: var(--neon);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    padding: 10px 12px;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .peer-input:focus { border-color: var(--neon); box-shadow: 0 0 10px rgba(0,255,231,0.15); }
+  .peer-input::placeholder { color: var(--muted); }
+
+  .send-btn {
+    padding: 10px 18px;
+    background: var(--neon2);
+    border: none;
+    color: #fff;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    border-radius: 2px;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+
+  .send-btn:hover { background: #ff5580; box-shadow: 0 0 15px rgba(255,60,110,0.4); }
+
+  /* Animations for new messages */
+  @keyframes fadeIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+  .feed-line { animation: fadeIn 0.3s ease; }
+
+  /* Shake animation for lose */
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+  .shake { animation: shake 0.4s ease; }
+
+  /* Footer */
+  footer {
+    position: relative;
+    z-index: 10;
+    text-align: center;
+    padding: 24px;
+    border-top: 1px solid rgba(0,255,231,0.1);
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+  }
+
+  footer a { color: var(--neon); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Trac<span>Arena</span></div>
+  <div class="tagline">P2P Duel Gaming · Powered by Intercom Network</div>
+  <div class="net-status"><span class="dot"></span> INTERCOM NODE ACTIVE · PEERS: <span id="peerCount">12</span></div>
+</header>
+
+<main>
+  <!-- GAME -->
+  <div class="card game-card">
+    <div class="card-title">⚔ Live Duel Arena — Rock · Paper · Scissors</div>
+    <div class="game-area">
+      <div class="vs-row">
+        <div class="player-box">
+          <div class="player-label">YOU</div>
+          <div class="choice-display" id="playerChoice">?</div>
+        </div>
+        <div class="vs-text">VS</div>
+        <div class="player-box">
+          <div class="player-label">OPPONENT</div>
+          <div class="choice-display" id="opponentChoice">?</div>
+        </div>
+      </div>
+
+      <div class="choices-row">
+        <button class="choice-btn" onclick="play('🪨')" title="Rock">🪨</button>
+        <button class="choice-btn" onclick="play('📄')" title="Paper">📄</button>
+        <button class="choice-btn" onclick="play('✂️')" title="Scissors">✂️</button>
+      </div>
+
+      <div class="result-text" id="resultText">— SELECT YOUR MOVE —</div>
+
+      <div class="score-row">
+        <div class="score-item">
+          <div class="score-num" id="wScore">0</div>
+          <div class="score-label">WINS</div>
+        </div>
+        <div class="score-item">
+          <div class="score-num yellow" id="dScore">0</div>
+          <div class="score-label">DRAWS</div>
+        </div>
+        <div class="score-item">
+          <div class="score-num red" id="lScore">0</div>
+          <div class="score-label">LOSSES</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="card">
+    <div class="card-title">🏆 Global Leaderboard</div>
+    <div id="leaderboard"></div>
+  </div>
+
+  <!-- INTERCOM FEED -->
+  <div class="card red">
+    <div class="card-title">📡 Intercom P2P Feed</div>
+    <div class="feed" id="feed"></div>
+    <div class="input-row">
+      <input class="peer-input" id="challengeInput" placeholder="Peer Trac address..." />
+      <button class="send-btn" onclick="sendChallenge()">CHALLENGE</button>
+    </div>
+  </div>
+
+  <!-- WALLET -->
+  <div class="card yellow">
+    <div class="card-title">💳 Your Trac Identity</div>
+    <div style="font-size:0.75rem; color:var(--muted); line-height:1.7">
+      Connect your Trac wallet to register on the leaderboard and receive TNK rewards for duel victories.
+    </div>
+    <div class="trac-addr" id="tracAddr">bc1q...not connected</div>
+    <button class="connect-btn" onclick="connectWallet()">⚡ Connect Trac Wallet</button>
+
+    <div style="margin-top:20px; font-size:0.7rem; color:var(--muted); line-height:1.8;">
+      <div style="color:var(--neon3); letter-spacing:0.2em; margin-bottom:8px;">HOW TO EARN TNK</div>
+      Win duels → earn XP → climb leaderboard → receive TNK airdrops from TracArena reward pool every epoch.
+    </div>
+  </div>
+</main>
+
+<footer>
+  Built on <a href="https://github.com/Trac-Systems/intercom" target="_blank">Intercom</a> by Trac Systems ·
+  TracArena fork · Open source P2P gaming
+</footer>
+
+<script>
+  const choices = ['🪨','📄','✂️'];
+  const beats = { '🪨':'✂️', '📄':'🪨', '✂️':'📄' };
+  let wins=0, draws=0, losses=0;
+
+  // Leaderboard data
+  const lb = [
+    { name: 'shadow_blade.trac', score: 847 },
+    { name: 'void_caster.trac',  score: 712 },
+    { name: 'neon_phoenix.trac', score: 651 },
+    { name: 'crypto_wolf.trac',  score: 590 },
+    { name: 'arc_runner.trac',   score: 441 },
+    { name: 'you',               score: 0, isYou: true },
+  ];
+
+  function renderLB() {
+    lb.sort((a,b) => b.score - a.score);
+    const el = document.getElementById('leaderboard');
+    el.innerHTML = lb.map((p, i) => `
+      <div class="lb-row">
+        <div class="lb-rank ${i<3?'top':''}">#${i+1}</div>
+        <div class="lb-name" style="${p.isYou?'color:var(--neon)':''}">
+          ${p.isYou ? '▶ ' + (connectedAddr || p.name) : p.name}
+        </div>
+        <div class="lb-score">${p.score} XP</div>
+      </div>
+    `).join('');
+  }
+
+  function play(move) {
+    const opp = choices[Math.floor(Math.random()*3)];
+    const pc = document.getElementById('playerChoice');
+    const oc = document.getElementById('opponentChoice');
+    const rt = document.getElementById('resultText');
+
+    pc.textContent = '...';
+    oc.textContent = '...';
+    pc.className = 'choice-display';
+    oc.className = 'choice-display';
+    rt.className = 'result-text';
+    rt.textContent = 'CALCULATING...';
+
+    setTimeout(() => {
+      pc.textContent = move;
+      oc.textContent = opp;
+
+      let result, cls, oppCls;
+      if (move === opp) {
+        result = '⚡ DRAW ⚡'; cls = 'draw'; draws++;
+        document.getElementById('dScore').textContent = draws;
+      } else if (beats[move] === opp) {
+        result = '✦ VICTORY ✦'; cls = 'win'; oppCls = 'lose'; wins++;
+        document.getElementById('wScore').textContent = wins;
+        lb.find(p=>p.isYou).score += 10;
+        renderLB();
+        addFeed(`<span class="peer">opponent.trac</span> <span class="msg">was defeated! ⚔</span>`, 'win-line');
+      } else {
+        result = '✖ DEFEAT ✖'; cls = 'lose'; oppCls = 'win'; losses++;
+        document.getElementById('lScore').textContent = losses;
+        pc.classList.add('shake');
+        addFeed(`<span class="peer">opponent.trac</span> <span class="msg">wins the duel.</span>`);
+      }
+
+      rt.className = 'result-text ' + cls;
+      rt.textContent = result;
+      if (oppCls) oc.classList.add(oppCls);
+      pc.classList.add(cls === 'win' ? 'win' : cls === 'lose' ? 'lose' : '');
+    }, 400);
+  }
+
+  // Feed
+  const feed = document.getElementById('feed');
+  function addFeed(html, cls='') {
+    const now = new Date();
+    const ts = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+    const line = document.createElement('div');
+    line.className = 'feed-line ' + cls;
+    line.innerHTML = `<span class="ts">[${ts}]</span> ${html}`;
+    feed.appendChild(line);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  // Simulated P2P messages
+  const peers = ['shadow_blade','void_caster','neon_phoenix','crypto_wolf','arc_runner'];
+  const msgs = [
+    'connected to arena node',
+    'broadcast: challenge open',
+    'duel completed — result: WIN',
+    'XP synced to ledger',
+    'new peer joined arena',
+    'challenge accepted',
+    'epoch reward distributed',
+  ];
+
+  function randomFeed() {
+    const peer = peers[Math.floor(Math.random()*peers.length)];
+    const msg = msgs[Math.floor(Math.random()*msgs.length)];
+    const isChal = msg.includes('challenge');
+    addFeed(`<span class="peer">${peer}.trac</span> <span class="msg">${msg}</span>`, isChal ? 'challenge' : '');
+  }
+
+  // Peer count fluctuation
+  function updatePeers() {
+    const base = 12;
+    document.getElementById('peerCount').textContent = base + Math.floor(Math.random()*5);
+  }
+
+  setInterval(randomFeed, 3200);
+  setInterval(updatePeers, 5000);
+
+  // Initial feed
+  addFeed(`<span class="peer">system</span> <span class="msg">TracArena node initialized</span>`);
+  addFeed(`<span class="peer">system</span> <span class="msg">Intercom sidechain synced ✓</span>`);
+  setTimeout(() => addFeed(`<span class="peer">neon_phoenix.trac</span> <span class="msg">broadcast: challenge open</span>`, 'challenge'), 1000);
+
+  // Wallet
+  let connectedAddr = null;
+  function connectWallet() {
+    // Simulated connect
+    const addr = 'bc1q9x3z7...k4m2';
+    connectedAddr = addr;
+    document.getElementById('tracAddr').textContent = addr;
+    document.querySelector('.connect-btn').textContent = '✓ CONNECTED';
+    document.querySelector('.connect-btn').style.borderColor = 'var(--neon)';
+    addFeed(`<span class="peer">wallet</span> <span class="msg">Trac identity verified ✓</span>`);
+    renderLB();
+  }
+
+  function sendChallenge() {
+    const val = document.getElementById('challengeInput').value.trim();
+    if (!val) return;
+    addFeed(`<span class="peer">you</span> <span class="msg">→ challenge sent to ${val}</span>`, 'challenge');
+    document.getElementById('challengeInput').value = '';
+    setTimeout(() => {
+      addFeed(`<span class="peer">${val}</span> <span class="msg">accepted the challenge!</span>`, 'win-line');
+    }, 1500);
+  }
+
+  renderLB();
+</script>
+</body>
+</html>
